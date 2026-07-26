@@ -1,3 +1,5 @@
+import * as Tone from "tone";
+
 const video = document.getElementById("webcam");
 const keyboardsLayer = document.getElementById("keyboardsLayer");
 const plusBtn = document.getElementById("plusBtn");
@@ -9,6 +11,24 @@ const deleteChordBtn = document.getElementById("deleteChordBtn");
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const CHORD_LIBRARY = NOTE_NAMES.flatMap((n) => [n, n + "m"]);
+
+const NOTE_TO_SEMITONE = Object.fromEntries(NOTE_NAMES.map((n, i) => [n, i]));
+
+const synth = new Tone.PolySynth(Tone.Synth, {
+  oscillator: { type: "sine" },
+  envelope: { attack: 0.4, decay: 0.2, sustain: 0.8, release: 1.2 },
+}).toDestination();
+
+function chordToNotes(chordName) {
+  const isMinor = chordName.endsWith("m");
+  const root = isMinor ? chordName.slice(0, -1) : chordName;
+  const rootSemitone = NOTE_TO_SEMITONE[root];
+  if (rootSemitone === undefined) return ["C4", "E4", "G4"];
+  const baseMidi = 60 + rootSemitone; // C4 = MIDI 60
+  const thirdInterval = isMinor ? 3 : 4;
+  const midiNotes = [baseMidi, baseMidi + thirdInterval, baseMidi + 7];
+  return midiNotes.map((m) => Tone.Frequency(m, "midi").toNote());
+}
 
 let uidCounter = 0;
 const uid = () => "id" + uidCounter++;
@@ -47,7 +67,6 @@ function editingKeyboard() {
   return state.keyboards.find((k) => k.id === state.editingId) || null;
 }
 
-// --- drag-to-reorder state ---
 let dragging = null; // { kbId, chordId }
 
 window.addEventListener("mousemove", (e) => {
@@ -69,12 +88,6 @@ window.addEventListener("mousemove", (e) => {
 window.addEventListener("mouseup", () => {
   dragging = null;
 });
-
-function playChord(chord, padEl) {
-  console.log("played", chord.name);
-  padEl.classList.add("playing");
-  setTimeout(() => padEl.classList.remove("playing"), 200);
-}
 
 function renderKeyboard(kb) {
   const n = kb.chords.length;
@@ -101,7 +114,19 @@ function renderKeyboard(kb) {
         render();
       });
     } else if (state.mode === "idle") {
-      pad.addEventListener("click", () => playChord(chord, pad));
+      const notes = chordToNotes(chord.name);
+      const start = () => {
+        Tone.start();
+        synth.triggerAttack(notes);
+        pad.classList.add("playing");
+      };
+      const stop = () => {
+        synth.triggerRelease(notes);
+        pad.classList.remove("playing");
+      };
+      pad.addEventListener("mousedown", start);
+      pad.addEventListener("mouseup", stop);
+      pad.addEventListener("mouseleave", stop);
     }
 
     keyboardsLayer.appendChild(pad);
