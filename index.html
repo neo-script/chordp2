@@ -114,7 +114,11 @@
       #advancedSettings summary { font-size: 13px; cursor: pointer; color: #bbb; }
       #advancedSettings label { display: block; font-size: 12px; color: #999; margin: 10px 0 4px; }
       .settingLabelRow { display: flex; justify-content: space-between; align-items: baseline; }
-      #opacityValue { font-family: monospace; color: #bbb; }
+      #opacityValue {
+        font-family: monospace; color: #eee; width: 44px; text-align: right;
+        background: #26262a; border: 1px solid #333; border-radius: 4px;
+        padding: 2px 4px; font-size: 12px;
+      }
       #colorInput { width: 100%; height: 32px; border: none; background: none; cursor: pointer; }
       #hexReadout { font-size: 11px; color: #777; margin: 4px 0 0; font-family: monospace; }
       #opacityInput { width: 100%; }
@@ -143,7 +147,9 @@
           <p id="hexReadout"></p>
           <label for="opacityInput" class="settingLabelRow">
             <span>Transparency</span>
-            <span id="opacityValue"></span>
+            <span>
+              <input type="number" id="opacityValue" min="0" max="100" />%
+            </span>
           </label>
           <input type="range" id="opacityInput" min="0" max="100" />
         </details>
