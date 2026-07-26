@@ -40,7 +40,7 @@ const DEFAULT_RADIUS = 90;
 const GUIDE_OFFSET = 14; // how much further out the dashed guide sits beyond the pads
 const DIMMED_OPACITY = 0.3; // opacity for other keyboards' pads while one is being edited
 const PAD_HIT_RADIUS = 32; // how close the marker cursor must be to a pad center to trigger it
-const DET_SCALE = 0.55; // downscale factor for the detection canvas, for performance
+const DET_SCALE = 1; // downscale factor for the detection canvas, for performance
 
 let expandedRoot = null;
 
@@ -631,6 +631,8 @@ function setupMarkerDetection() {
   requestAnimationFrame(detectLoop);
 }
 
+let lastLogTime = 0;
+
 function detectLoop() {
   requestAnimationFrame(detectLoop);
   if (!detector || !video.videoWidth) return;
@@ -651,6 +653,13 @@ function detectLoop() {
     console.warn("Marker detection error:", err);
     return;
   }
+
+  const now = performance.now();
+  if (now - lastLogTime > 1000) {
+    lastLogTime = now;
+    console.log(`[aruco] markers detected this frame: ${markers.length}`);
+  }
+
   processMarkers(markers, detW, detH);
 }
 
