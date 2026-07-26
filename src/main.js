@@ -40,7 +40,7 @@ const DEFAULT_RADIUS = 90;
 const GUIDE_OFFSET = 14; // how much further out the dashed guide sits beyond the pads
 const DIMMED_OPACITY = 0.3; // opacity for other keyboards' pads while one is being edited
 const PAD_HIT_RADIUS = 32; // how close the marker cursor must be to a pad center to trigger it
-const DET_SCALE = 0.375; // downscale factor for the detection canvas, for performance
+const DET_SCALE = 0.55; // downscale factor for the detection canvas, for performance
 
 let expandedRoot = null;
 
@@ -553,6 +553,8 @@ function detectionPointToScreen(dx, dy, detW, detH) {
   return { x: mirroredX * scale - offsetX, y: rawY * scale - offsetY };
 }
 
+const GRACE_MS = 250; // keep tracking a marker this long after it's briefly lost, to avoid flicker
+const markerLastSeen = new Map(); // markerId -> { point, time }
 const markerHoverState = new Map(); // markerId -> currently-playing chord
 
 function updateCursorVisual(markerId, point) {
@@ -567,10 +569,9 @@ function updateCursorVisual(markerId, point) {
   dot.style.top = point.y + "px";
 }
 
-function removeStaleCursorVisuals(seenMarkerIds) {
-  arCursorsLayer.querySelectorAll(".arCursor").forEach((dot) => {
-    if (!seenMarkerIds.has(Number(dot.dataset.markerId))) dot.remove();
-  });
+function removeCursorVisual(markerId) {
+  const dot = arCursorsLayer.querySelector(`[data-marker-id="${markerId}"]`);
+  if (dot) dot.remove();
 }
 
 function handleMarkerHover(markerId, point) {
@@ -592,19 +593,27 @@ function releaseMarkerHover(markerId) {
 }
 
 function processMarkers(markers, detW, detH) {
-  const seenMarkerIds = new Set();
+  const now = performance.now();
+
   markers.forEach((marker) => {
-    seenMarkerIds.add(marker.id);
     const cx = marker.corners.reduce((sum, c) => sum + c.x, 0) / 4;
     const cy = marker.corners.reduce((sum, c) => sum + c.y, 0) / 4;
     const point = detectionPointToScreen(cx, cy, detW, detH);
-    updateCursorVisual(marker.id, point);
-    handleMarkerHover(marker.id, point);
+    markerLastSeen.set(marker.id, { point, time: now });
   });
-  for (const markerId of markerHoverState.keys()) {
-    if (!seenMarkerIds.has(markerId)) releaseMarkerHover(markerId);
+
+  // Act on every marker seen recently (not just this exact frame), so a brief
+  // dropout in detection doesn't flicker the cursor or cut off a held chord.
+  for (const [markerId, info] of markerLastSeen.entries()) {
+    if (now - info.time <= GRACE_MS) {
+      updateCursorVisual(markerId, info.point);
+      handleMarkerHover(markerId, info.point);
+    } else {
+      releaseMarkerHover(markerId);
+      removeCursorVisual(markerId);
+      markerLastSeen.delete(markerId);
+    }
   }
-  removeStaleCursorVisuals(seenMarkerIds);
 }
 
 let detector = null;
