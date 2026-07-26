@@ -197,8 +197,9 @@ function renderRingGuide(kb) {
 
 function renderBox(kb) {
   const size = 2 * (kb.radius + MARGIN);
+  const isSelected = state.mode === "selected" && kb.id === state.activeKbId;
   const box = document.createElement("div");
-  box.className = "kbBox" + (state.mode === "selected" && kb.id === state.activeKbId ? " selected" : "");
+  box.className = "kbBox";
   box.style.left = kb.x + "px";
   box.style.top = kb.y + "px";
   box.style.width = size + "px";
@@ -209,9 +210,35 @@ function renderBox(kb) {
     boxDrag = { kbId: kb.id, lastX: e.clientX, lastY: e.clientY };
     render();
   });
+
+  if (isSelected) {
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("width", size);
+    svg.setAttribute("height", size);
+    svg.style.position = "absolute";
+    svg.style.top = "0";
+    svg.style.left = "0";
+    svg.style.overflow = "visible";
+    svg.style.pointerEvents = "none";
+    const rect = document.createElementNS(svgNS, "rect");
+    rect.setAttribute("x", "1");
+    rect.setAttribute("y", "1");
+    rect.setAttribute("width", size - 2);
+    rect.setAttribute("height", size - 2);
+    rect.setAttribute("rx", "14");
+    rect.setAttribute("fill", "none");
+    rect.setAttribute("stroke", "rgba(255,255,255,0.55)");
+    rect.setAttribute("stroke-width", "1.5");
+    rect.setAttribute("stroke-dasharray", "6 5");
+    rect.setAttribute("class", "marchAnts");
+    svg.appendChild(rect);
+    box.appendChild(svg);
+  }
+
   keyboardsLayer.appendChild(box);
 
-  if (state.mode === "selected" && kb.id === state.activeKbId) {
+  if (isSelected) {
     const half = size / 2;
     [
       [kb.x - half, kb.y - half],
