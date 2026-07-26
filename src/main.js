@@ -2,6 +2,7 @@ import * as Tone from "tone";
 
 const video = document.getElementById("webcam");
 const keyboardsLayer = document.getElementById("keyboardsLayer");
+const arCursorsLayer = document.getElementById("arCursors");
 const dimOverlay = document.getElementById("dimOverlay");
 const plusBtn = document.getElementById("plusBtn");
 const doneBtn = document.getElementById("doneBtn");
@@ -38,6 +39,8 @@ const MIN_RADIUS = 50;
 const DEFAULT_RADIUS = 90;
 const GUIDE_OFFSET = 14; // how much further out the dashed guide sits beyond the pads
 const DIMMED_OPACITY = 0.3; // opacity for other keyboards' pads while one is being edited
+const PAD_HIT_RADIUS = 32; // how close the marker cursor must be to a pad center to trigger it
+const DET_SCALE = 0.375; // downscale factor for the detection canvas, for performance
 
 let expandedRoot = null;
 
@@ -90,6 +93,23 @@ const state = {
 };
 
 const activeChordIds = new Set();
+
+function playChordById(chord) {
+  if (activeChordIds.has(chord.id)) return;
+  activeChordIds.add(chord.id);
+  Tone.start();
+  synth.triggerAttack(chordToNotes(chord.name));
+  const el = keyboardsLayer.querySelector(`[data-chord-id="${chord.id}"]`);
+  if (el) el.classList.add("playing");
+}
+
+function stopChordById(chord) {
+  if (!activeChordIds.has(chord.id)) return;
+  activeChordIds.delete(chord.id);
+  synth.triggerRelease(chordToNotes(chord.name));
+  const el = keyboardsLayer.querySelector(`[data-chord-id="${chord.id}"]`);
+  if (el) el.classList.remove("playing");
+}
 
 function makeChord(name) {
   return { id: uid(), name, color: "#ffffff", opacity: 100 };
@@ -298,6 +318,7 @@ function renderKeyboardPads(kb) {
 
     const pad = document.createElement("div");
     pad.className = "pad";
+    pad.dataset.chordId = chord.id;
     pad.style.left = px + "px";
     pad.style.top = py + "px";
     const visual = padVisualStyle(chord);
@@ -317,23 +338,9 @@ function renderKeyboardPads(kb) {
         render();
       });
     } else if (isPlayable) {
-      const notes = chordToNotes(chord.name);
-      const start = () => {
-        if (activeChordIds.has(chord.id)) return;
-        activeChordIds.add(chord.id);
-        Tone.start();
-        synth.triggerAttack(notes);
-        pad.classList.add("playing");
-      };
-      const stop = () => {
-        if (!activeChordIds.has(chord.id)) return;
-        activeChordIds.delete(chord.id);
-        synth.triggerRelease(notes);
-        pad.classList.remove("playing");
-      };
-      pad.addEventListener("mousedown", start);
-      pad.addEventListener("mouseup", stop);
-      pad.addEventListener("mouseleave", stop);
+      pad.addEventListener("mousedown", () => playChordById(chord));
+      pad.addEventListener("mouseup", () => stopChordById(chord));
+      pad.addEventListener("mouseleave", () => stopChordById(chord));
     }
 
     keyboardsLayer.appendChild(pad);
@@ -510,5 +517,134 @@ async function setupCamera() {
   }
 }
 
+// --- ArUco marker tracking (performance-mode chord triggering) ---
+
+function findPadAtPoint(x, y) {
+  if (state.mode !== "idle") return null;
+  for (const kb of state.keyboards) {
+    const n = kb.chords.length;
+    for (let i = 0; i < n; i++) {
+      const angle = ((-90 + i * (360 / n)) * Math.PI) / 180;
+      const px = kb.x + kb.radius * Math.cos(angle);
+      const py = kb.y + kb.radius * Math.sin(angle);
+      if (Math.hypot(x - px, y - py) <= PAD_HIT_RADIUS) {
+        return kb.chords[i];
+      }
+    }
+  }
+  return null;
+}
+
+// Maps a point from the (possibly downscaled) detection canvas into on-screen
+// CSS pixel coordinates, accounting for the mirrored, object-fit:cover video.
+function detectionPointToScreen(dx, dy, detW, detH) {
+  const rawX = dx * (video.videoWidth / detW);
+  const rawY = dy * (video.videoHeight / detH);
+  const mirroredX = video.videoWidth - rawX;
+
+  const viewportW = window.innerWidth;
+  const viewportH = window.innerHeight;
+  const scale = Math.max(viewportW / video.videoWidth, viewportH / video.videoHeight);
+  const displayedW = video.videoWidth * scale;
+  const displayedH = video.videoHeight * scale;
+  const offsetX = (displayedW - viewportW) / 2;
+  const offsetY = (displayedH - viewportH) / 2;
+
+  return { x: mirroredX * scale - offsetX, y: rawY * scale - offsetY };
+}
+
+const markerHoverState = new Map(); // markerId -> currently-playing chord
+
+function updateCursorVisual(markerId, point) {
+  let dot = arCursorsLayer.querySelector(`[data-marker-id="${markerId}"]`);
+  if (!dot) {
+    dot = document.createElement("div");
+    dot.className = "arCursor";
+    dot.dataset.markerId = markerId;
+    arCursorsLayer.appendChild(dot);
+  }
+  dot.style.left = point.x + "px";
+  dot.style.top = point.y + "px";
+}
+
+function removeStaleCursorVisuals(seenMarkerIds) {
+  arCursorsLayer.querySelectorAll(".arCursor").forEach((dot) => {
+    if (!seenMarkerIds.has(Number(dot.dataset.markerId))) dot.remove();
+  });
+}
+
+function handleMarkerHover(markerId, point) {
+  const hitChord = findPadAtPoint(point.x, point.y);
+  const prevChord = markerHoverState.get(markerId) || null;
+  const changed = (hitChord ? hitChord.id : null) !== (prevChord ? prevChord.id : null);
+
+  if (changed && prevChord) stopChordById(prevChord);
+  if (changed && hitChord) playChordById(hitChord);
+
+  if (hitChord) markerHoverState.set(markerId, hitChord);
+  else markerHoverState.delete(markerId);
+}
+
+function releaseMarkerHover(markerId) {
+  const prevChord = markerHoverState.get(markerId);
+  if (prevChord) stopChordById(prevChord);
+  markerHoverState.delete(markerId);
+}
+
+function processMarkers(markers, detW, detH) {
+  const seenMarkerIds = new Set();
+  markers.forEach((marker) => {
+    seenMarkerIds.add(marker.id);
+    const cx = marker.corners.reduce((sum, c) => sum + c.x, 0) / 4;
+    const cy = marker.corners.reduce((sum, c) => sum + c.y, 0) / 4;
+    const point = detectionPointToScreen(cx, cy, detW, detH);
+    updateCursorVisual(marker.id, point);
+    handleMarkerHover(marker.id, point);
+  });
+  for (const markerId of markerHoverState.keys()) {
+    if (!seenMarkerIds.has(markerId)) releaseMarkerHover(markerId);
+  }
+  removeStaleCursorVisuals(seenMarkerIds);
+}
+
+let detector = null;
+let detCanvas = null;
+let detCtx = null;
+
+function setupMarkerDetection() {
+  if (!window.AR) {
+    console.warn("ArUco library not loaded; marker tracking disabled.");
+    return;
+  }
+  detector = new window.AR.Detector({ dictionaryName: "ARUCO_MIP_36h12" });
+  detCanvas = document.createElement("canvas");
+  detCtx = detCanvas.getContext("2d", { willReadFrequently: true });
+  requestAnimationFrame(detectLoop);
+}
+
+function detectLoop() {
+  requestAnimationFrame(detectLoop);
+  if (!detector || !video.videoWidth) return;
+
+  const detW = Math.max(160, Math.round(video.videoWidth * DET_SCALE));
+  const detH = Math.max(90, Math.round(video.videoHeight * DET_SCALE));
+  if (detCanvas.width !== detW || detCanvas.height !== detH) {
+    detCanvas.width = detW;
+    detCanvas.height = detH;
+  }
+  detCtx.drawImage(video, 0, 0, detW, detH);
+
+  let markers = [];
+  try {
+    const imageData = detCtx.getImageData(0, 0, detW, detH);
+    markers = detector.detect(imageData);
+  } catch (err) {
+    console.warn("Marker detection error:", err);
+    return;
+  }
+  processMarkers(markers, detW, detH);
+}
+
 setupCamera();
+setupMarkerDetection();
 render();
