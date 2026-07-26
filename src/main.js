@@ -40,7 +40,7 @@ const DEFAULT_RADIUS = 90;
 const GUIDE_OFFSET = 14; // how much further out the dashed guide sits beyond the pads
 const DIMMED_OPACITY = 0.3; // opacity for other keyboards' pads while one is being edited
 const PAD_HIT_RADIUS = 32; // how close the marker cursor must be to a pad center to trigger it
-const DET_SCALE = 1; // downscale factor for the detection canvas, for performance
+const DET_SCALE = 0.75; // downscale factor for the detection canvas, for performance
 
 let expandedRoot = null;
 
