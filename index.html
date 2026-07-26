@@ -16,7 +16,7 @@
         position: absolute; width: 56px; height: 56px; border-radius: 50%;
         border: 2px solid rgba(255,255,255,0.5);
         display: flex; align-items: center; justify-content: center;
-        font-family: system-ui, sans-serif; font-weight: 600; font-size: 14px;
+        font-family: system-ui, sans-serif; font-weight: 600; font-size: 13px;
         color: #111; transform: translate(-50%, -50%); cursor: pointer;
         user-select: none; box-shadow: 0 2px 8px rgba(0,0,0,0.45);
         transition: transform 0.12s ease;
@@ -64,13 +64,28 @@
         display: none; border-left: 1px solid #2c2c30;
       }
       #libraryPanel h3 { font-size: 15px; margin: 0 0 12px; font-weight: 600; }
-      #libraryGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 16px; }
-      #libraryGrid button {
-        font-size: 12px; padding: 8px 0; border-radius: 6px; border: 1px solid #333;
-        background: #26262a; color: #eee; cursor: pointer; transition: background 0.12s ease;
+
+      #libraryGrid { margin-bottom: 16px; }
+      .rootRow {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 8px 6px; border-radius: 6px; cursor: default;
       }
-      #libraryGrid button:hover { background: #333338; }
-      #libraryGrid button.assigned { border-color: #EF9F27; background: #3a2e1c; }
+      .rootRow.current { background: #3a2e1c; }
+      .rootLabel { font-size: 13px; font-weight: 600; }
+      .rootArrow {
+        background: none; border: none; color: #999; font-size: 13px;
+        cursor: pointer; padding: 4px 8px;
+      }
+      .rootArrow:hover { color: #fff; }
+      .qualityRow {
+        display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 6px 10px;
+      }
+      .qualityRow button {
+        font-size: 11px; padding: 6px 10px; border-radius: 6px; border: 1px solid #333;
+        background: #26262a; color: #eee; cursor: pointer;
+      }
+      .qualityRow button:hover { background: #333338; }
+      .qualityRow button.assigned { border-color: #EF9F27; background: #3a2e1c; }
 
       #newChordBtn, #deleteChordBtn {
         width: 100%; margin-bottom: 8px; font-size: 12px; padding: 9px 0;
