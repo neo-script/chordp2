@@ -35,7 +35,7 @@ const CHORD_QUALITIES = [
 const MARGIN = 40; // fixed gap between ring edge and its box hitbox, same for every keyboard
 const MIN_RADIUS = 50;
 const DEFAULT_RADIUS = 90;
-const GUIDE_OFFSET = 30; // how much further out the dashed guide sits beyond the pads
+const GUIDE_OFFSET = 14; // how much further out the dashed guide sits beyond the pads
 
 let expandedRoot = null;
 
@@ -354,7 +354,14 @@ function updateAdvancedSettingsUI() {
   colorInput.value = pad.color;
   hexReadout.textContent = pad.color;
   opacityInput.value = pad.opacity;
-  opacityValue.textContent = pad.opacity + "%";
+  opacityValue.value = pad.opacity;
+}
+
+function setOpacity(pad, value) {
+  const clamped = Math.min(100, Math.max(0, Math.round(value) || 0));
+  pad.opacity = clamped;
+  opacityInput.value = clamped;
+  opacityValue.value = clamped;
 }
 
 function render() {
@@ -427,8 +434,15 @@ opacityInput.addEventListener("input", () => {
   const kb = activeKeyboard();
   const pad = kb ? kb.chords.find((c) => c.id === state.selectedPadId) : null;
   if (!pad) return;
-  pad.opacity = Number(opacityInput.value);
-  opacityValue.textContent = pad.opacity + "%";
+  setOpacity(pad, Number(opacityInput.value));
+  render();
+});
+
+opacityValue.addEventListener("input", () => {
+  const kb = activeKeyboard();
+  const pad = kb ? kb.chords.find((c) => c.id === state.selectedPadId) : null;
+  if (!pad) return;
+  setOpacity(pad, Number(opacityValue.value));
   render();
 });
 
