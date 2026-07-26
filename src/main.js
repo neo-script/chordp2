@@ -2,6 +2,7 @@ import * as Tone from "tone";
 
 const video = document.getElementById("webcam");
 const keyboardsLayer = document.getElementById("keyboardsLayer");
+const emptyHint = document.getElementById("emptyHint");
 const plusBtn = document.getElementById("plusBtn");
 const doneBtn = document.getElementById("doneBtn");
 const libraryPanel = document.getElementById("libraryPanel");
@@ -11,6 +12,7 @@ const deleteChordBtn = document.getElementById("deleteChordBtn");
 const colorInput = document.getElementById("colorInput");
 const hexReadout = document.getElementById("hexReadout");
 const opacityInput = document.getElementById("opacityInput");
+const opacityValue = document.getElementById("opacityValue");
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const NOTE_TO_SEMITONE = Object.fromEntries(NOTE_NAMES.map((n, i) => [n, i]));
@@ -34,7 +36,7 @@ const CHORD_QUALITIES = [
 const MARGIN = 40; // fixed gap between ring edge and its box hitbox, same for every keyboard
 const MIN_RADIUS = 50;
 
-let expandedRoot = null; // which root's quality accordion is open in the library panel
+let expandedRoot = null;
 
 const limiter = new Tone.Limiter(-6).toDestination();
 const synth = new Tone.PolySynth(Tone.Synth, {
@@ -164,6 +166,16 @@ window.addEventListener("mouseup", () => {
   boxDrag = null;
   resizeDrag = null;
 });
+
+function renderRingGuide(kb) {
+  const guide = document.createElement("div");
+  guide.className = "ringGuide";
+  guide.style.left = kb.x + "px";
+  guide.style.top = kb.y + "px";
+  guide.style.width = kb.radius * 2 + "px";
+  guide.style.height = kb.radius * 2 + "px";
+  keyboardsLayer.appendChild(guide);
+}
 
 function renderBox(kb) {
   const size = 2 * (kb.radius + MARGIN);
@@ -334,6 +346,7 @@ function updateAdvancedSettingsUI() {
   colorInput.value = pad.color;
   hexReadout.textContent = pad.color;
   opacityInput.value = pad.opacity;
+  opacityValue.textContent = pad.opacity + "%";
 }
 
 function render() {
@@ -342,8 +355,10 @@ function render() {
   if (state.mode !== "editing") {
     state.keyboards.forEach(renderBox);
   }
+  state.keyboards.forEach(renderRingGuide);
   state.keyboards.forEach(renderKeyboardPads);
 
+  emptyHint.style.display = state.keyboards.length === 0 ? "block" : "none";
   plusBtn.style.display = state.mode === "editing" ? "none" : "flex";
   libraryPanel.style.display = state.mode === "editing" ? "block" : "none";
 
@@ -406,6 +421,7 @@ opacityInput.addEventListener("input", () => {
   const pad = kb ? kb.chords.find((c) => c.id === state.selectedPadId) : null;
   if (!pad) return;
   pad.opacity = Number(opacityInput.value);
+  opacityValue.textContent = pad.opacity + "%";
   render();
 });
 
