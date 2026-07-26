@@ -2,6 +2,7 @@ import * as Tone from "tone";
 
 const video = document.getElementById("webcam");
 const keyboardsLayer = document.getElementById("keyboardsLayer");
+const dimOverlay = document.getElementById("dimOverlay");
 const plusBtn = document.getElementById("plusBtn");
 const doneBtn = document.getElementById("doneBtn");
 const libraryPanel = document.getElementById("libraryPanel");
@@ -36,6 +37,7 @@ const MARGIN = 40; // fixed gap between ring edge and its box hitbox, same for e
 const MIN_RADIUS = 50;
 const DEFAULT_RADIUS = 90;
 const GUIDE_OFFSET = 14; // how much further out the dashed guide sits beyond the pads
+const DIMMED_OPACITY = 0.3; // opacity for other keyboards' pads while one is being edited
 
 let expandedRoot = null;
 
@@ -66,6 +68,15 @@ function hexToRgba(hex, opacityPct) {
   const g = parseInt(clean.substring(2, 4), 16);
   const b = parseInt(clean.substring(4, 6), 16);
   return `rgba(${r},${g},${b},${opacityPct / 100})`;
+}
+
+function padVisualStyle(chord) {
+  const fill = hexToRgba(chord.color, chord.opacity);
+  const glow = hexToRgba(chord.color, 45);
+  return {
+    background: `radial-gradient(circle at 32% 28%, rgba(255,255,255,0.55), rgba(255,255,255,0) 45%), ${fill}`,
+    boxShadow: `0 0 16px ${glow}, 0 2px 6px rgba(0,0,0,0.35), inset 0 -3px 5px rgba(0,0,0,0.22), inset 0 2px 4px rgba(255,255,255,0.3)`,
+  };
 }
 
 let uidCounter = 0;
@@ -120,7 +131,6 @@ function findFreePosition(radius) {
       if (!wouldCollide(null, x, y, radius)) return { x, y };
     }
   }
-  // Extremely unlikely fallback if the grid search above is exhausted
   return { x: 200 + Math.random() * 600, y: 200 + Math.random() * 600 };
 }
 
@@ -252,6 +262,7 @@ function renderKeyboardPads(kb) {
   const isActiveEditing = state.mode === "editing" && kb.id === state.activeKbId;
   const isActiveSelected = state.mode === "selected" && kb.id === state.activeKbId;
   const isPlayable = state.mode === "idle" || (state.mode === "selected" && !isActiveSelected);
+  const isDimmed = state.mode === "editing" && !isActiveEditing;
 
   kb.chords.forEach((chord, i) => {
     const angle = ((-90 + i * (360 / n)) * Math.PI) / 180;
@@ -262,7 +273,10 @@ function renderKeyboardPads(kb) {
     pad.className = "pad";
     pad.style.left = px + "px";
     pad.style.top = py + "px";
-    pad.style.background = hexToRgba(chord.color, chord.opacity);
+    const visual = padVisualStyle(chord);
+    pad.style.background = visual.background;
+    pad.style.boxShadow = visual.boxShadow;
+    pad.style.opacity = isDimmed ? DIMMED_OPACITY : 1;
     pad.textContent = chord.name;
 
     if (isActiveEditing && chord.id === state.selectedPadId) {
@@ -374,7 +388,8 @@ function render() {
   state.keyboards.forEach(renderKeyboardPads);
 
   plusBtn.style.display = state.mode === "editing" ? "none" : "flex";
-  libraryPanel.style.display = state.mode === "editing" ? "block" : "none";
+  libraryPanel.classList.toggle("open", state.mode === "editing");
+  dimOverlay.classList.toggle("active", state.mode === "editing");
 
   if (state.mode === "editing") {
     renderLibrary();
@@ -394,6 +409,9 @@ keyboardsLayer.addEventListener("click", (e) => {
 });
 
 plusBtn.addEventListener("click", () => {
+  plusBtn.classList.add("popping");
+  setTimeout(() => plusBtn.classList.remove("popping"), 300);
+
   const { x, y } = findFreePosition(DEFAULT_RADIUS);
   const kb = createKeyboard(x, y);
   state.keyboards.push(kb);
