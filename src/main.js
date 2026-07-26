@@ -13,11 +13,28 @@ const hexReadout = document.getElementById("hexReadout");
 const opacityInput = document.getElementById("opacityInput");
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-const CHORD_LIBRARY = NOTE_NAMES.flatMap((n) => [n, n + "m"]);
 const NOTE_TO_SEMITONE = Object.fromEntries(NOTE_NAMES.map((n, i) => [n, i]));
+const ROOTS_BY_LENGTH = [...NOTE_NAMES].sort((a, b) => b.length - a.length);
+
+const CHORD_QUALITIES = [
+  { suffix: "", label: "Major", intervals: [0, 4, 7] },
+  { suffix: "m", label: "Minor", intervals: [0, 3, 7] },
+  { suffix: "7", label: "Dom7", intervals: [0, 4, 7, 10] },
+  { suffix: "maj7", label: "Maj7", intervals: [0, 4, 7, 11] },
+  { suffix: "m7", label: "Min7", intervals: [0, 3, 7, 10] },
+  { suffix: "dim", label: "Dim", intervals: [0, 3, 6] },
+  { suffix: "aug", label: "Aug", intervals: [0, 4, 8] },
+  { suffix: "sus2", label: "Sus2", intervals: [0, 2, 7] },
+  { suffix: "sus4", label: "Sus4", intervals: [0, 5, 7] },
+  { suffix: "6", label: "6", intervals: [0, 4, 7, 9] },
+  { suffix: "add9", label: "Add9", intervals: [0, 4, 7, 14] },
+  { suffix: "m7b5", label: "m7b5", intervals: [0, 3, 6, 10] },
+];
 
 const MARGIN = 40; // fixed gap between ring edge and its box hitbox, same for every keyboard
 const MIN_RADIUS = 50;
+
+let expandedRoot = null; // which root's quality accordion is open in the library panel
 
 const limiter = new Tone.Limiter(-6).toDestination();
 const synth = new Tone.PolySynth(Tone.Synth, {
@@ -26,15 +43,18 @@ const synth = new Tone.PolySynth(Tone.Synth, {
 }).connect(limiter);
 synth.volume.value = -10;
 
+function parseChordName(name) {
+  const root = ROOTS_BY_LENGTH.find((r) => name.startsWith(r)) || "C";
+  const suffix = name.slice(root.length);
+  return { root, suffix };
+}
+
 function chordToNotes(chordName) {
-  const isMinor = chordName.endsWith("m");
-  const root = isMinor ? chordName.slice(0, -1) : chordName;
-  const rootSemitone = NOTE_TO_SEMITONE[root];
-  if (rootSemitone === undefined) return ["C4", "E4", "G4"];
+  const { root, suffix } = parseChordName(chordName);
+  const quality = CHORD_QUALITIES.find((q) => q.suffix === suffix) || CHORD_QUALITIES[0];
+  const rootSemitone = NOTE_TO_SEMITONE[root] ?? 0;
   const baseMidi = 60 + rootSemitone;
-  const thirdInterval = isMinor ? 3 : 4;
-  const midiNotes = [baseMidi, baseMidi + thirdInterval, baseMidi + 7];
-  return midiNotes.map((m) => Tone.Frequency(m, "midi").toNote());
+  return quality.intervals.map((iv) => Tone.Frequency(baseMidi + iv, "midi").toNote());
 }
 
 function hexToRgba(hex, opacityPct) {
@@ -99,10 +119,9 @@ function wouldCollide(kbId, x, y, radius) {
   );
 }
 
-// --- drag state ---
-let padDrag = null; // reordering a pad within the ring being edited
-let boxDrag = null; // moving a keyboard's box
-let resizeDrag = null; // resizing a keyboard's box via a handle
+let padDrag = null;
+let boxDrag = null;
+let resizeDrag = null;
 
 window.addEventListener("mousemove", (e) => {
   if (padDrag) {
@@ -261,20 +280,50 @@ function renderKeyboardPads(kb) {
 }
 
 function renderLibrary() {
+  libraryGrid.innerHTML = "";
   const kb = activeKeyboard();
   const currentPad = kb ? kb.chords.find((c) => c.id === state.selectedPadId) : null;
-  libraryGrid.innerHTML = "";
-  CHORD_LIBRARY.forEach((name) => {
-    const btn = document.createElement("button");
-    btn.textContent = name;
-    if (currentPad && currentPad.name === name) btn.classList.add("assigned");
-    btn.addEventListener("click", () => {
-      if (!kb || !state.selectedPadId) return;
-      const pad = kb.chords.find((c) => c.id === state.selectedPadId);
-      if (pad) pad.name = name;
-      render();
+  const currentParsed = currentPad ? parseChordName(currentPad.name) : null;
+
+  NOTE_NAMES.forEach((root) => {
+    const rootRow = document.createElement("div");
+    rootRow.className = "rootRow" + (currentParsed && currentParsed.root === root ? " current" : "");
+
+    const label = document.createElement("span");
+    label.className = "rootLabel";
+    label.textContent = root;
+    rootRow.appendChild(label);
+
+    const arrow = document.createElement("button");
+    arrow.className = "rootArrow";
+    arrow.textContent = expandedRoot === root ? "\u25B4" : "\u25BE";
+    arrow.setAttribute("aria-label", "Show " + root + " variations");
+    arrow.addEventListener("click", () => {
+      expandedRoot = expandedRoot === root ? null : root;
+      renderLibrary();
     });
-    libraryGrid.appendChild(btn);
+    rootRow.appendChild(arrow);
+
+    libraryGrid.appendChild(rootRow);
+
+    if (expandedRoot === root) {
+      const qualityRow = document.createElement("div");
+      qualityRow.className = "qualityRow";
+      CHORD_QUALITIES.forEach((q) => {
+        const chordName = root + q.suffix;
+        const btn = document.createElement("button");
+        btn.textContent = chordName;
+        if (currentPad && currentPad.name === chordName) btn.classList.add("assigned");
+        btn.addEventListener("click", () => {
+          if (!kb || !state.selectedPadId) return;
+          const pad = kb.chords.find((c) => c.id === state.selectedPadId);
+          if (pad) pad.name = chordName;
+          render();
+        });
+        qualityRow.appendChild(btn);
+      });
+      libraryGrid.appendChild(qualityRow);
+    }
   });
 }
 
@@ -322,6 +371,7 @@ plusBtn.addEventListener("click", () => {
   state.mode = "editing";
   state.activeKbId = kb.id;
   state.selectedPadId = kb.chords[0].id;
+  expandedRoot = null;
   render();
 });
 
