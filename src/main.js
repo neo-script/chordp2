@@ -14,17 +14,19 @@ const CHORD_LIBRARY = NOTE_NAMES.flatMap((n) => [n, n + "m"]);
 
 const NOTE_TO_SEMITONE = Object.fromEntries(NOTE_NAMES.map((n, i) => [n, i]));
 
+const limiter = new Tone.Limiter(-6).toDestination();
 const synth = new Tone.PolySynth(Tone.Synth, {
   oscillator: { type: "sine" },
   envelope: { attack: 0.4, decay: 0.2, sustain: 0.8, release: 1.2 },
-}).toDestination();
+}).connect(limiter);
+synth.volume.value = -10;
 
 function chordToNotes(chordName) {
   const isMinor = chordName.endsWith("m");
   const root = isMinor ? chordName.slice(0, -1) : chordName;
   const rootSemitone = NOTE_TO_SEMITONE[root];
   if (rootSemitone === undefined) return ["C4", "E4", "G4"];
-  const baseMidi = 60 + rootSemitone; // C4 = MIDI 60
+  const baseMidi = 60 + rootSemitone;
   const thirdInterval = isMinor ? 3 : 4;
   const midiNotes = [baseMidi, baseMidi + thirdInterval, baseMidi + 7];
   return midiNotes.map((m) => Tone.Frequency(m, "midi").toNote());
@@ -35,10 +37,12 @@ const uid = () => "id" + uidCounter++;
 
 const state = {
   keyboards: [],
-  mode: "idle", // "idle" | "editing"
+  mode: "idle",
   editingId: null,
   selectedPadId: null,
 };
+
+const activeChordIds = new Set();
 
 function createKeyboard(x, y) {
   return {
@@ -67,7 +71,7 @@ function editingKeyboard() {
   return state.keyboards.find((k) => k.id === state.editingId) || null;
 }
 
-let dragging = null; // { kbId, chordId }
+let dragging = null;
 
 window.addEventListener("mousemove", (e) => {
   if (!dragging) return;
@@ -116,11 +120,15 @@ function renderKeyboard(kb) {
     } else if (state.mode === "idle") {
       const notes = chordToNotes(chord.name);
       const start = () => {
+        if (activeChordIds.has(chord.id)) return;
+        activeChordIds.add(chord.id);
         Tone.start();
         synth.triggerAttack(notes);
         pad.classList.add("playing");
       };
       const stop = () => {
+        if (!activeChordIds.has(chord.id)) return;
+        activeChordIds.delete(chord.id);
         synth.triggerRelease(notes);
         pad.classList.remove("playing");
       };
