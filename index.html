@@ -5,7 +5,7 @@
     <title>Chord tool</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&display=swap" rel="stylesheet" />
     <style>
       :root {
         --accent: #4ADE80;
@@ -27,11 +27,11 @@
       video {
         position: absolute; top: 0; left: 0; width: 100%; height: 100%;
         object-fit: cover; transform: scaleX(-1);
-        filter: brightness(0.45) contrast(1.05) blur(1px) saturate(0.5);
+        filter: brightness(0.85) contrast(1.03) saturate(0.85);
       }
       #tint {
         position: absolute; inset: 0; z-index: 1; pointer-events: none;
-        background: linear-gradient(160deg, rgba(8,16,24,0.55), rgba(16,24,39,0.75));
+        background: linear-gradient(160deg, rgba(8,16,24,0.22), rgba(16,24,39,0.3));
       }
       #glow1 {
         position: absolute; width: 600px; height: 600px; left: -150px; top: -150px;
@@ -61,7 +61,7 @@
         position: absolute; width: 58px; height: 58px; border-radius: 50%;
         border: 1px solid rgba(255,255,255,0.35);
         display: flex; align-items: center; justify-content: center;
-        font-family: 'Fredoka', system-ui, sans-serif; font-weight: 600; font-size: 14px;
+        font-family: 'Chakra Petch', system-ui, sans-serif; font-weight: 600; font-size: 14px;
         color: #12161f; transform: translate(-50%, -50%); cursor: pointer;
         user-select: none;
         transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), box-shadow 0.2s ease, opacity 0.2s ease;
@@ -80,26 +80,16 @@
 
       .ringGuide {
         position: absolute; border-radius: 50%; transform: translate(-50%, -50%);
-        border: 1.5px solid rgba(255,255,255,0.14);
-        box-shadow: 0 0 18px rgba(255,255,255,0.04);
+        border: 1.5px dotted rgba(255,255,255,0.28);
         pointer-events: none; box-sizing: border-box; z-index: 2;
       }
 
       .kbBox {
         position: absolute; transform: translate(-50%, -50%);
-        border-radius: 20px; border: none; background: transparent;
-        z-index: 1; box-sizing: border-box;
+        border-radius: 16px; z-index: 1; box-sizing: border-box;
       }
-      @keyframes selectPulse {
-        0%, 100% { box-shadow: 0 0 30px rgba(96,165,250,0.12); }
-        50% { box-shadow: 0 0 46px rgba(96,165,250,0.22); }
-      }
-      .kbBox.selected {
-        border: 1px solid rgba(255,255,255,0.16);
-        border-radius: 50%;
-        background: radial-gradient(circle, rgba(255,255,255,0.05), transparent 70%);
-        animation: selectPulse 2.4s ease-in-out infinite;
-      }
+      @keyframes marchAnts { to { stroke-dashoffset: -22; } }
+      .marchAnts { animation: marchAnts 0.9s linear infinite; }
 
       .handle {
         position: absolute; width: 14px; height: 14px; border-radius: 50%;
@@ -111,7 +101,7 @@
       .boxActionBtn {
         position: absolute; transform: translate(-50%, -100%);
         font-family: system-ui, sans-serif; font-size: 12px; padding: 6px 14px;
-        border-radius: 999px; cursor: pointer; z-index: 6; white-space: nowrap;
+        border-radius: 8px; cursor: pointer; z-index: 6; white-space: nowrap;
         border: 1px solid var(--glass-border); backdrop-filter: blur(6px);
         transition: background 0.15s ease;
       }
@@ -138,7 +128,7 @@
 
       #libraryPanel {
         position: absolute; top: 0; right: 0; bottom: 0; width: 280px;
-        background: var(--glass-bg); backdrop-filter: blur(16px);
+        background: var(--glass-bg); backdrop-filter: blur(10px);
         color: var(--text); padding: 28px 24px; box-sizing: border-box;
         font-family: system-ui, sans-serif; overflow-y: auto; z-index: 20;
         border-left: 1px solid var(--glass-border);
@@ -147,12 +137,12 @@
         transition: transform 0.25s ease, opacity 0.25s ease, filter 0.25s ease;
       }
       #libraryPanel.open { transform: translateX(0); opacity: 1; filter: blur(0); pointer-events: auto; }
-      #libraryPanel h3 { font-size: 24px; margin: 0 0 20px; font-weight: 600; }
+      #libraryPanel h3 { font-size: 24px; margin: 0 0 20px; font-weight: 600; font-family: 'Chakra Petch', system-ui, sans-serif; }
 
       .sectionLabel {
         font-size: 12px; font-weight: 600; color: var(--text-dim); text-transform: uppercase;
         letter-spacing: 0.08em; margin: 22px 0 10px; padding-top: 14px;
-        border-top: 1px solid var(--glass-border);
+        border-top: 1px solid var(--glass-border); font-family: 'Chakra Petch', system-ui, sans-serif;
       }
       .sectionLabel:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
 
@@ -170,7 +160,7 @@
       .rootArrow:hover { color: var(--text); }
       .qualityRow { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 8px 14px; }
       .qualityRow button {
-        font-size: 11px; padding: 7px 11px; border-radius: 999px;
+        font-size: 11px; padding: 7px 11px; border-radius: 6px;
         border: 1px solid var(--glass-border); background: var(--glass-hover);
         color: var(--text); cursor: pointer; transition: background 0.15s ease;
       }
@@ -182,7 +172,7 @@
 
       .btn {
         width: 100%; padding: 11px 0; font-size: 13px; font-weight: 600;
-        border-radius: 13px; cursor: pointer; margin-bottom: 8px;
+        border-radius: 8px; cursor: pointer; margin-bottom: 8px;
         transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
         border: none;
       }
