@@ -2,7 +2,6 @@ import * as Tone from "tone";
 
 const video = document.getElementById("webcam");
 const keyboardsLayer = document.getElementById("keyboardsLayer");
-const emptyHint = document.getElementById("emptyHint");
 const plusBtn = document.getElementById("plusBtn");
 const doneBtn = document.getElementById("doneBtn");
 const libraryPanel = document.getElementById("libraryPanel");
@@ -35,6 +34,8 @@ const CHORD_QUALITIES = [
 
 const MARGIN = 40; // fixed gap between ring edge and its box hitbox, same for every keyboard
 const MIN_RADIUS = 50;
+const DEFAULT_RADIUS = 90;
+const GUIDE_OFFSET = 30; // how much further out the dashed guide sits beyond the pads
 
 let expandedRoot = null;
 
@@ -88,21 +89,9 @@ function createKeyboard(x, y) {
     id: uid(),
     x,
     y,
-    radius: 90,
+    radius: DEFAULT_RADIUS,
     chords: [makeChord("C"), makeChord("G"), makeChord("F"), makeChord("Am")],
   };
-}
-
-function nextPosition() {
-  const count = state.keyboards.length;
-  return {
-    x: 220 + (count % 3) * 220,
-    y: 220 + Math.floor(count / 3) * 220,
-  };
-}
-
-function activeKeyboard() {
-  return state.keyboards.find((k) => k.id === state.activeKbId) || null;
 }
 
 function boxRect(x, y, radius) {
@@ -119,6 +108,24 @@ function wouldCollide(kbId, x, y, radius) {
   return state.keyboards.some(
     (other) => other.id !== kbId && rectsOverlap(testRect, boxRect(other.x, other.y, other.radius))
   );
+}
+
+function findFreePosition(radius) {
+  const stepX = 240;
+  const stepY = 240;
+  for (let row = 0; row < 12; row++) {
+    for (let col = 0; col < 12; col++) {
+      const x = 200 + col * stepX;
+      const y = 200 + row * stepY;
+      if (!wouldCollide(null, x, y, radius)) return { x, y };
+    }
+  }
+  // Extremely unlikely fallback if the grid search above is exhausted
+  return { x: 200 + Math.random() * 600, y: 200 + Math.random() * 600 };
+}
+
+function activeKeyboard() {
+  return state.keyboards.find((k) => k.id === state.activeKbId) || null;
 }
 
 let padDrag = null;
@@ -168,12 +175,13 @@ window.addEventListener("mouseup", () => {
 });
 
 function renderRingGuide(kb) {
+  const guideRadius = kb.radius + GUIDE_OFFSET;
   const guide = document.createElement("div");
   guide.className = "ringGuide";
   guide.style.left = kb.x + "px";
   guide.style.top = kb.y + "px";
-  guide.style.width = kb.radius * 2 + "px";
-  guide.style.height = kb.radius * 2 + "px";
+  guide.style.width = guideRadius * 2 + "px";
+  guide.style.height = guideRadius * 2 + "px";
   keyboardsLayer.appendChild(guide);
 }
 
@@ -358,7 +366,6 @@ function render() {
   state.keyboards.forEach(renderRingGuide);
   state.keyboards.forEach(renderKeyboardPads);
 
-  emptyHint.style.display = state.keyboards.length === 0 ? "block" : "none";
   plusBtn.style.display = state.mode === "editing" ? "none" : "flex";
   libraryPanel.style.display = state.mode === "editing" ? "block" : "none";
 
@@ -380,7 +387,7 @@ keyboardsLayer.addEventListener("click", (e) => {
 });
 
 plusBtn.addEventListener("click", () => {
-  const { x, y } = nextPosition();
+  const { x, y } = findFreePosition(DEFAULT_RADIUS);
   const kb = createKeyboard(x, y);
   state.keyboards.push(kb);
   state.mode = "editing";
